@@ -1,130 +1,69 @@
-import java.util.Arrays;
+import java.util.Random;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.RecursiveAction;
-
-class MergeSort {
-
-    public static void mergeSort(int[] list){
-        if(list.length > 1) {
-
-            //merge sort the first half
-            int[] firstHalf = new int[list.length / 2];
-            System.arraycopy(list,0,firstHalf,0,list.length / 2);
-            mergeSort(firstHalf);
-
-            //merge sort the second half
-            int secondHalfLength = list.length - list.length / 2;
-            int[] secondHalf = new int[secondHalfLength];
-            System.arraycopy(list,list.length / 2,secondHalf,0,secondHalfLength);
-            mergeSort(secondHalf);
-
-            // merge
-            merge(firstHalf, secondHalf, list);
-        }
-
-
-    }
-
-
-    public static void merge(int[] list1, int[] list2, int[] temp){
-
-        int i = 0;
-        int j = 0;
-        int k = 0;
-
-        while (i < list1.length && j < list2.length) {
-            if (list1[i] < list2[j]) {
-                temp[k] = list1[i];
-                //k++;
-                i++;
-            } else {
-                temp[k] = list2[j];
-                //k++;
-                j++;
-            }
-            k++;
-        }
-        while (i < list1.length) {
-            temp[k] = list1[i];
-            k++;
-            i++;
-        }
-        while (j < list2.length) {
-            temp[k] = list2[j];
-            k++;
-            j++;
-        }
-
-    }
-
-}
-
-
-
+import java.util.concurrent.RecursiveTask;
 
 public class Main {
-    //RecursiveAction 本身extend ForkJoinTask
-    private static class SortTask extends RecursiveAction {
 
-        private  final int THRESHOLD = 500; //零件點
-        private  int[] list;
+    public static class RecursiveDemo extends RecursiveTask<Integer> {
+        private static final int MAX = 70;
+        private int[] arr;
+        private int start;
+        private int end;
 
-        public SortTask(int[] list) {
-            this.list = list;
+        public RecursiveDemo(int[] arr, int start, int end) {
+            this.arr = arr;
+            this.start = start;
+            this.end = end;
         }
+
 
         @Override
-        protected void compute() {
-            if (list.length < THRESHOLD) {
-                Arrays.sort(list);
+        protected Integer compute() {
+
+            int sum = 0;
+
+            if((end - start) < MAX) {
+                for (int i = start; i < end; i++) {
+                    sum += arr[i];
+                }
+                return sum;
+
             } else {
-                //obtain the first half
-
-                //merge sort the first half
-                int[] firstHalf = new int[list.length / 2];
-                System.arraycopy(list,0,firstHalf,0,list.length / 2);
-
-
-                //merge sort the second half
-                int secondHalfLength = list.length - list.length / 2;
-                int[] secondHalf = new int[secondHalfLength];
-                System.arraycopy(list,list.length / 2,secondHalf,0,secondHalfLength);
-
-                //implements ForkJoinTask, input Task and will execute
-                invokeAll(new SortTask(firstHalf), new SortTask(secondHalf));
-                MergeSort.merge(firstHalf, secondHalf, list);
+                int middle = (start + end) / 2;
+                RecursiveDemo left = new RecursiveDemo(arr, start, middle);
+                RecursiveDemo right = new RecursiveDemo(arr, middle, end);
+                invokeAll(left, right);
+                return left.join() + right.join(); //left.join & right.join will return Integer
             }
+
         }
-    }
-
-
-    public static void parallelMergeSort(int[] list) {
-        RecursiveAction recursiveAction = new SortTask(list);
-        ForkJoinPool forkJoinPool = new ForkJoinPool();
-        forkJoinPool.invoke(recursiveAction);
     }
 
     public static void main(String[] args) {
-
-        final int SIZE = 7000000;
-        int[] list1 = new int[SIZE];
-        int[] list2 = new int[SIZE];
-
-        for (int i = 0; i < list1.length; i++) {
-            list1[i] = (int) (Math.random() * 100000);
-            list2[i] = (int) (Math.random() * 100000);
-
-        }
+        int[] arr = new int[100000000];
+        Random random = new Random();
 
         long startTime = System.currentTimeMillis();
-        parallelMergeSort(list1);
+        int total = 0;
+        for (int i = 0; i < arr.length; i++) {
+            int temp = random.nextInt();
+            arr[i] = temp;
+            total += arr[i];
+        }
         long endTime = System.currentTimeMillis();
-        System.out.println("Parallel with " + Runtime.getRuntime().availableProcessors() + " processors is " + (endTime - startTime) + " milliseconds");
 
+        System.out.println("總和為" + total);
+        System.out.println("線性加法所花時間為 : " + (endTime - startTime) + " milliseconds.");
+
+        ForkJoinPool forkJoinPool = new ForkJoinPool();
         startTime = System.currentTimeMillis();
-        MergeSort.mergeSort(list2);
+
+        int result = forkJoinPool.invoke(new RecursiveDemo(arr,0,arr.length));
         endTime = System.currentTimeMillis();
-        System.out.println("Sequential time is " + (endTime - startTime) + " milliseconds.");
+
+        System.out.println("總合為" + result);
+        System.out.println("並行加法所花時間為 : " + (endTime - startTime) + " milliseconds.");
+        forkJoinPool.shutdown();
 
     }
 }
